@@ -1,0 +1,140 @@
+async function listEvents() {
+
+    try {
+
+        const response = await fetch('https://dynamic-events-api.onrender.com/api/eventos');
+
+        if (!response.ok) {
+            throw new Error(console.error);
+        }
+
+        const events = await response.json();
+
+        console.log('Eventos carregados: ', events);
+
+        const wrapper = document.getElementById('listaProgramas');
+
+        //só estou utilizando esse "eventt", pois o event nao é possível
+        events.forEach(eventt => {
+
+            const card = document.createElement('article');
+
+            card.innerHTML = `
+                <article class="program-card program-card--featured">
+            <div class="program-card__image-wrap">
+              <img
+                class="program-card__image"
+                src="${eventt.imagem}"
+                alt="${eventt.nome}"
+              />
+            </div>
+
+            <div class="program-card__body">
+              <div class="program-card__meta">
+                <span class="badge">${eventt.categoria}</span>
+                <span class="badge badge--primary">${eventt.destaque ? `<span>Destaque</span>` : ""}</span>
+                
+              </div>
+
+              <h3>${eventt.nome}</h3>
+              <p>
+                ${eventt.descricao}
+              </p>
+
+              <div class="program-card__details">
+                <span>${eventt.data}</span>
+                <span>${eventt.local}</span>
+              </div>
+
+              <div class="program-card__footer">
+                <strong>${eventt.preco},00 R$</strong>
+                <span class="vagas vagas--baixas">${eventt.vagas_disponiveis}</span>
+              </div>
+
+              <a class="btn btn-outline" href="detalhe.html?id=ev_1e6d6ac9">Ver detalhes</a>
+            </div>
+          </article>
+            `
+
+            wrapper.appendChild(card);
+           
+        })
+    } catch (error) {
+
+        console.error('Nenhum programa encontrado!')
+    }
+
+}
+
+listEvents();
+
+async function renderEvent() {
+
+    const renderCard = document.createElement('article');
+
+            card.innerHTML = `
+                <article id="detalhePrograma" class="detail-card">
+          <!-- Conteúdo mockado para referência visual. O JavaScript deverá substituir pelos dados reais da API. -->
+          <div class="detail-card__image-wrap">
+            <img
+              class="detail-card__image"
+              src="https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1200"
+              alt="Imagem do programa Eficiência Energética em Motores IE4"
+            />
+          </div>
+
+          <div class="detail-card__content">
+            <div class="program-card__meta">
+              <span class="badge">Treinamentos</span>
+              <span class="badge badge--primary">Destaque</span>
+            </div>
+
+            <h1>Eficiência Energética em Motores IE4</h1>
+            <p>
+              Treinamento de 8h para engenheiros e técnicos sobre dimensionamento de motores de alta eficiência e retorno de investimento (ROI).
+            </p>
+
+            <div class="detail-list">
+              <div>
+                <span>Investimento</span>
+                <strong>R$ 690,00</strong>
+              </div>
+              <div>
+                <span>Data</span>
+                <strong>20/03/2026, 09:00</strong>
+              </div>
+              <div>
+                <span>Local</span>
+                <strong>Auditório WEG Motores — Jaraguá do Sul, SC</strong>
+              </div>
+              <div>
+                <span>Vagas disponíveis</span>
+                <strong class="vagas vagas--baixas">6 vagas disponíveis</strong>
+              </div>
+            </div>
+          </div>
+        </article>
+            `
+
+            wrapper.appendChild(card);
+}
+
+
+async function orderCards() {
+
+    const events = await listEvents();
+
+    for(let i = 0; i < events.length; i++) {
+
+        if(events.destaque === true) {
+
+        }
+
+    }
+
+}
+
+
+async function searchByFilter() {
+
+}
