@@ -1,215 +1,174 @@
-const API_URL = 'https://dynamic-events-api.onrender.com/api/eventos';
+const url = 'https://dynamic-events-api.onrender.com/api/eventos';
 
-// Os dados ficam salvos para a busca e os filtros não precisarem chamar a API novamente.
+const lista = document.getElementById('listaProgramas');
+const mensagem = document.getElementById('mensagem');
+const busca = document.getElementById('campoBusca');
+const detalhe = document.getElementById('detalhePrograma');
+
 let eventos = [];
-let categoriaAtual = '';
+let categoria = '';
 
-function precoEmReais(preco) {
-  const valor = Number(preco);
-  return Number.isFinite(valor)
-    ? valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-    : 'Preço indisponível';
-}
-
-function mostrarMensagem(elemento, texto, erro = false) {
+// Cria um elemento e adiciona ao elemento pai.
+function criarElemento(pai, tag, classe, texto) {
+  const elemento = document.createElement(tag);
+  elemento.className = classe;
   elemento.textContent = texto;
-  elemento.className = erro ? 'mensagem erro' : 'mensagem';
+  pai.appendChild(elemento);
+  return elemento;
 }
 
-// Monta um card usando as classes CSS fornecidas na prova.
-function criarCard(evento) {
-  const card = document.createElement('article');
-  card.className = 'program-card';
+// Busca os eventos na API.
+async function listEvents() {
+  mensagem.textContent = 'Carregando programas...';
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Erro na API');
+
+    eventos = await response.json();
+    eventos.sort((a, b) => Number(b.destaque) - Number(a.destaque));
+    renderEvents();
+  } catch (error) {
+    mensagem.textContent = 'Erro ao carregar programas.';
+    mensagem.className = 'mensagem erro';
+  }
+}
+
+// Cria um card e adiciona na lista.
+function renderEvent(evento) {
+  const card = criarElemento(lista, 'article', 'program-card', '');
 
   if (evento.destaque) {
     card.classList.add('program-card--featured');
   }
 
-  card.innerHTML = `
-    <div class="program-card__image-wrap">
-      <img class="program-card__image" alt="">
-    </div>
-    <div class="program-card__body">
-      <div class="program-card__meta">
-        <span class="badge categoria"></span>
-      </div>
-      <h3></h3>
-      <p class="descricao"></p>
-      <div class="program-card__details">
-        <span class="data"></span>
-        <span class="local"></span>
-      </div>
-      <div class="program-card__footer">
-        <strong class="preco"></strong>
-        <span class="vagas"></span>
-      </div>
-      <a class="btn btn-outline">Ver detalhes</a>
-    </div>
-  `;
+  const imageWrap = criarElemento(card, 'div', 'program-card__image-wrap', '');
+  const imagem = criarElemento(imageWrap, 'img', 'program-card__image', '');
+  imagem.src = evento.imagem;
+  imagem.alt = evento.nome;
 
-  const imagem = card.querySelector('.program-card__image');
-  imagem.src = evento.imagem || '';
-  imagem.alt = evento.nome || 'Imagem do programa';
+  const body = criarElemento(card, 'div', 'program-card__body', '');
+  const meta = criarElemento(body, 'div', 'program-card__meta', '');
+  criarElemento(meta, 'span', 'badge', evento.categoria);
 
-  card.querySelector('.categoria').textContent = evento.categoria || '';
-  card.querySelector('h3').textContent = evento.nome || '';
-  card.querySelector('.descricao').textContent = evento.descricao || '';
-  card.querySelector('.data').textContent = evento.data || '';
-  card.querySelector('.local').textContent = evento.local || '';
-  card.querySelector('.preco').textContent = precoEmReais(evento.preco);
+  if (evento.destaque) {
+    criarElemento(meta, 'span', 'badge badge--primary', 'Destaque');
+  }
 
-  const vagas = card.querySelector('.vagas');
-  vagas.textContent = `${evento.vagas_disponiveis} vagas disponíveis`;
-  if (Number(evento.vagas_disponiveis) < 10) {
+  criarElemento(body, 'h3', '', evento.nome);
+  criarElemento(body, 'p', '', evento.descricao);
+
+  const details = criarElemento(body, 'div', 'program-card__details', '');
+  criarElemento(details, 'span', '', evento.data);
+  criarElemento(details, 'span', '', evento.local);
+
+  const footer = criarElemento(body, 'div', 'program-card__footer', '');
+  criarElemento(footer, 'strong', '', 'R$ ' + Number(evento.preco).toFixed(2));
+
+  const vagas = criarElemento(footer, 'span', 'vagas', evento.vagas_disponiveis + ' vagas disponíveis');
+
+  if (evento.vagas_disponiveis < 10) {
     vagas.classList.add('vagas--baixas');
   }
 
-  if (evento.destaque) {
-    const badge = document.createElement('span');
-    badge.className = 'badge badge--primary';
-    badge.textContent = 'Destaque';
-    card.querySelector('.program-card__meta').appendChild(badge);
-  }
-
-  card.querySelector('a').href = `detalhe.html?id=${encodeURIComponent(evento.id)}`;
-  return card;
+  const link = criarElemento(body, 'a', 'btn btn-outline', 'Ver detalhes');
+  link.href = 'detalhe.html?id=' + encodeURIComponent(evento.id);
 }
 
-// Atualiza os cards sem recarregar a página.
-function renderizarEventos() {
-  const lista = document.getElementById('listaProgramas');
-  const mensagem = document.getElementById('mensagem');
-  const texto = document.getElementById('campoBusca').value.trim().toLocaleLowerCase('pt-BR');
+// Filtra e lista os eventos.
+function renderEvents() {
+  lista.textContent = '';
+  const texto = busca.value.trim().toLowerCase();
 
   const filtrados = eventos.filter(evento => {
-    const categoria = String(evento.categoria || '').toLocaleLowerCase('pt-BR');
-    const categoriaCorreta = !categoriaAtual || categoria === categoriaAtual.toLocaleLowerCase('pt-BR');
-    const conteudo = `${evento.nome || ''} ${evento.descricao || ''} ${evento.local || ''}`.toLocaleLowerCase('pt-BR');
-    return categoriaCorreta && conteudo.includes(texto);
+    const categoriaCorreta = categoria === '' || evento.categoria.toLowerCase() === categoria.toLowerCase();
+    const textoCorreto = evento.nome.toLowerCase().includes(texto) ||
+      evento.descricao.toLowerCase().includes(texto) ||
+      evento.local.toLowerCase().includes(texto);
+
+    return categoriaCorreta && textoCorreto;
   });
 
-  lista.replaceChildren(); // Remove os cards antigos.
+  filtrados.forEach(evento => renderEvent(evento));
 
-  if (filtrados.length === 0) {
-    mostrarMensagem(mensagem, 'Nenhum programa encontrado.');
-    return;
-  }
-
-  // appendChild coloca cada card na div #listaProgramas.
-  filtrados.forEach(evento => lista.appendChild(criarCard(evento)));
-  mostrarMensagem(mensagem, '');
+  mensagem.textContent = filtrados.length === 0 ? 'Nenhum programa encontrado.' : '';
 }
 
-// Consulta todos os eventos e ordena os destaques primeiro.
-async function listarEventos() {
-  const mensagem = document.getElementById('mensagem');
-  mostrarMensagem(mensagem, 'Carregando programas...');
-
-  try {
-    const resposta = await fetch(API_URL);
-    if (!resposta.ok) throw new Error(`Erro HTTP ${resposta.status}`);
-
-    const dados = await resposta.json();
-    if (!Array.isArray(dados)) throw new Error('Formato inesperado da API');
-
-    eventos = dados.sort((a, b) => Number(Boolean(b.destaque)) - Number(Boolean(a.destaque)));
-    renderizarEventos();
-  } catch (erro) {
-    console.error('Erro ao carregar programas:', erro);
-    mostrarMensagem(mensagem, 'Não foi possível carregar os programas.', true);
-  }
-}
-
-// Lê o ID na URL e busca as informações de um único programa.
-async function carregarDetalhe() {
-  const mensagem = document.getElementById('mensagemDetalhe');
-  const container = document.getElementById('detalhePrograma');
+// Busca e exibe os detalhes.
+async function detailsRender() {
+  const mensagemDetalhe = document.getElementById('mensagemDetalhe');
   const id = new URLSearchParams(window.location.search).get('id');
 
   if (!id) {
-    mostrarMensagem(mensagem, 'Nenhum ID de programa informado.', true);
+    mensagemDetalhe.textContent = 'Nenhum ID informado.';
     return;
   }
 
-  mostrarMensagem(mensagem, 'Carregando detalhes do programa...');
+  mensagemDetalhe.textContent = 'Carregando detalhes...';
 
   try {
-    const resposta = await fetch(`${API_URL}/${encodeURIComponent(id)}`);
-    if (resposta.status === 404) {
-      mostrarMensagem(mensagem, 'Programa não encontrado.', true);
+    const response = await fetch(url + '/' + encodeURIComponent(id));
+
+    if (response.status === 404) {
+      mensagemDetalhe.textContent = 'Programa não encontrado.';
       return;
     }
-    if (!resposta.ok) throw new Error(`Erro HTTP ${resposta.status}`);
 
-    const evento = await resposta.json();
-    if (!evento || typeof evento !== 'object' || !evento.id) {
-      throw new Error('Dados inválidos do programa');
-    }
+    if (!response.ok) throw new Error('Erro na API');
 
-    container.innerHTML = `
-      <div class="detail-card__image-wrap">
-        <img class="detail-card__image" alt="">
-      </div>
-      <div class="detail-card__content">
-        <div class="program-card__meta">
-          <span class="badge categoria"></span>
-        </div>
-        <h1></h1>
-        <p class="descricao"></p>
-        <div class="detail-list">
-          <div><span>Preço</span><strong class="preco"></strong></div>
-          <div><span>Data</span><strong class="data"></strong></div>
-          <div><span>Local</span><strong class="local"></strong></div>
-          <div><span>Disponibilidade</span><strong class="vagas"></strong></div>
-        </div>
-      </div>
-    `;
+    const evento = await response.json();
+    detalhe.textContent = '';
 
-    const imagem = container.querySelector('.detail-card__image');
-    imagem.src = evento.imagem || '';
-    imagem.alt = evento.nome || 'Imagem do programa';
+    const imageWrap = criarElemento(detalhe, 'div', 'detail-card__image-wrap', '');
+    const imagem = criarElemento(imageWrap, 'img', 'detail-card__image', '');
+    imagem.src = evento.imagem;
+    imagem.alt = evento.nome;
 
-    container.querySelector('.categoria').textContent = evento.categoria || '';
-    container.querySelector('h1').textContent = evento.nome || '';
-    container.querySelector('.descricao').textContent = evento.descricao || '';
-    container.querySelector('.preco').textContent = precoEmReais(evento.preco);
-    container.querySelector('.data').textContent = evento.data || '';
-    container.querySelector('.local').textContent = evento.local || '';
-
-    const vagas = container.querySelector('.vagas');
-    vagas.textContent = `${evento.vagas_disponiveis} vagas disponíveis`;
-    if (Number(evento.vagas_disponiveis) < 10) vagas.classList.add('vagas--baixas');
+    const content = criarElemento(detalhe, 'div', 'detail-card__content', '');
+    criarElemento(content, 'span', 'badge', evento.categoria);
 
     if (evento.destaque) {
-      const badge = document.createElement('span');
-      badge.className = 'badge badge--primary';
-      badge.textContent = 'Destaque';
-      container.querySelector('.program-card__meta').appendChild(badge);
+      criarElemento(content, 'span', 'badge badge--primary', 'Destaque');
     }
 
-    mostrarMensagem(mensagem, '');
-  } catch (erro) {
-    console.error('Erro ao carregar detalhes:', erro);
-    mostrarMensagem(mensagem, 'Não foi possível carregar os detalhes do programa.', true);
+    criarElemento(content, 'h1', '', evento.nome);
+    criarElemento(content, 'p', '', evento.descricao);
+
+    const dados = criarElemento(content, 'div', 'detail-list', '');
+    criarElemento(dados, 'div', '', 'Preço: R$ ' + Number(evento.preco).toFixed(2));
+    criarElemento(dados, 'div', '', 'Data: ' + evento.data);
+    criarElemento(dados, 'div', '', 'Local: ' + evento.local);
+
+    const vagas = criarElemento(dados, 'strong', 'vagas', evento.vagas_disponiveis + ' vagas disponíveis');
+
+    if (evento.vagas_disponiveis < 10) {
+      vagas.classList.add('vagas--baixas');
+    }
+
+    mensagemDetalhe.textContent = '';
+  } catch (error) {
+    mensagemDetalhe.textContent = 'Erro ao carregar detalhes.';
+    mensagemDetalhe.className = 'mensagem erro';
   }
 }
 
-// Executa apenas a parte correspondente à página aberta.
-if (document.getElementById('listaProgramas')) {
-  document.getElementById('campoBusca').addEventListener('input', renderizarEventos);
+// Executa de acordo com a página aberta.
+if (lista) {
+  listEvents();
+  busca.addEventListener('input', renderEvents);
 
-  document.querySelectorAll('.filtro').forEach(botao => {
+  const botoes = document.querySelectorAll('.filtro');
+
+  botoes.forEach(botao => {
     botao.addEventListener('click', () => {
-      document.querySelectorAll('.filtro').forEach(item => item.classList.remove('ativo'));
+      botoes.forEach(item => item.classList.remove('ativo'));
       botao.classList.add('ativo');
-      categoriaAtual = botao.dataset.categoria;
-      renderizarEventos();
+      categoria = botao.dataset.categoria;
+      renderEvents();
     });
   });
-
-  listarEventos();
 }
 
-if (document.getElementById('detalhePrograma')) {
-  carregarDetalhe();
+if (detalhe) {
+  detailsRender();
 }
